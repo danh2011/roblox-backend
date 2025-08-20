@@ -1,38 +1,59 @@
+// server.js
 const express = require('express');
-const app = express();
 const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
 
-mongoose.connect('mongodb://localhost:27017/roblox-backend', { useNewUrlParser: true, useUnifiedTopology: true });
+const app = express();
+app.use(bodyParser.json());
 
+// MongoDB connection
+const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/roblox-backend';
+mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Define User schema
 const User = mongoose.model('User', {
   username: String,
   placeId: String,
   instanceId: String
 });
 
-app.use(bodyParser.json());
-
+// Endpoint to get user by username
 app.post('/user', async (req, res) => {
-  const { username } = req.body;
-  const user = await User.findOne({ username });
-  if (user) {
-    res.json(user);
-  } else {
-    res.status(404).json({ error: 'User not found' });
+  try {
+    const { username } = req.body;
+    const user = await User.findOne({ username });
+    if (user) {
+      res.json(user);
+    } else {
+      res.status(404).json({ error: 'User not found' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
+// Endpoint to update user's current place/instance
 app.post('/teleport', async (req, res) => {
-  const { username, placeId, instanceId } = req.body;
-  const user = await User.findOne({ username });
-  if (user) {
-    TeleportService:TeleportToPlaceInstance(placeId, instanceId, user);
-    res.json({ message: 'User teleported' });
-  } else {
-    res.status(404).json({ error: 'User not found' });
+  try {
+    const { username, placeId, instanceId } = req.body;
+    const user = await User.findOne({ username });
+    if (user) {
+      user.placeId = placeId;
+      user.instanceId = instanceId;
+      await user.save();
+      res.json({ message: 'User updated successfully' });
+    } else {
+      res.status(404).json({ error: 'User not found' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
-app.listen(3000, () => {
-  console.log('Server listening on port 3000');
+// Use Render's port or default to 3000
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
 });
